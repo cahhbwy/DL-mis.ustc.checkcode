@@ -7,14 +7,14 @@ from PIL import Image, ImageDraw
 
 def discriminator(d_00, label, training, reuse=None):
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_01 = tf.layers.conv2d(d_00, 20, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x20
+        d_01 = tf.layers.conv2d(d_00, 80, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x20
         d_02 = tf.layers.batch_normalization(d_01, momentum=0.95, epsilon=1e-4, training=training, name="dis_02")  # 16x16x20
         d_03 = tf.layers.max_pooling2d(d_02, 2, 2, "valid", name="dis_03")  # 8x8x20
-        d_04 = tf.layers.conv2d(d_03, 50, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_04")  # 4x4x50
+        d_04 = tf.layers.conv2d(d_03, 200, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_04")  # 4x4x50
         d_05 = tf.layers.batch_normalization(d_04, momentum=0.95, epsilon=1e-4, training=training, name="dis_05")  # 4x4x50
         d_06 = tf.layers.max_pooling2d(d_05, 2, 2, "valid", name="dis_06")  # 2x2x50
         d_07 = tf.layers.flatten(d_06, name="dis_07")  # 200
-        d_08 = tf.layers.dense(d_07, 500, activation=tf.nn.relu, name="dis_08")  # 500
+        d_08 = tf.layers.dense(d_07, 2500, activation=tf.nn.relu, name="dis_08")  # 500
         d_09 = tf.layers.dropout(d_08, 0.2, name="dis_09")  # 500
         d_10 = tf.layers.dense(d_09, 1, name="dis_10")  # 1
         loss = tf.losses.sigmoid_cross_entropy(label, d_10)
@@ -23,24 +23,24 @@ def discriminator(d_00, label, training, reuse=None):
 
 def generator(rand, training, reuse=None):
     with tf.variable_scope("generator", reuse=reuse):
-        g_00 = tf.layers.dense(rand, 5 * 5 * 20, activation=tf.nn.leaky_relu, name="gen_00")  # 500
-        g_01 = tf.reshape(g_00, [-1, 5, 5, 20], name="gen_01")  # 5x5x20
+        g_00 = tf.layers.dense(rand, 5 * 5 * 80, activation=tf.nn.leaky_relu, name="gen_00")  # 500
+        g_01 = tf.reshape(g_00, [-1, 5, 5, 80], name="gen_01")  # 5x5x20
         g_01_bn = tf.layers.batch_normalization(g_01, momentum=0.95, epsilon=1e-4, training=training, name="gen_01_bn")
-        g_02 = tf.layers.conv2d_transpose(g_01_bn, 10, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_02")  # 10x10x10
+        g_02 = tf.layers.conv2d_transpose(g_01_bn, 40, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_02")  # 10x10x10
         g_02_bn = tf.layers.batch_normalization(g_02, momentum=0.95, epsilon=1e-4, training=training, name="gen_02_bn")
 
-        g_03 = tf.layers.dense(rand, 10 * 10 * 10, activation=tf.nn.leaky_relu, name="gen_03")  # 1000
-        g_04 = tf.reshape(g_03, [-1, 10, 10, 10], name="gen_04")  # 10x10x10
+        g_03 = tf.layers.dense(rand, 10 * 10 * 40, activation=tf.nn.leaky_relu, name="gen_03")  # 1000
+        g_04 = tf.reshape(g_03, [-1, 10, 10, 40], name="gen_04")  # 10x10x10
         g_04_bn = tf.layers.batch_normalization(g_04, momentum=0.95, epsilon=1e-4, training=training, name="gen_04_bn")
         g_05 = tf.concat([g_02_bn, g_04_bn], axis=3, name="gen_05")  # 10x10x20
-        g_06 = tf.layers.conv2d_transpose(g_05, 5, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_06")  # 20x20x5
+        g_06 = tf.layers.conv2d_transpose(g_05, 20, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_06")  # 20x20x5
         g_06_bn = tf.layers.batch_normalization(g_06, momentum=0.95, epsilon=1e-4, training=training, name="gen_06_bn")
 
-        g_07 = tf.layers.dense(rand, 20 * 20 * 5, activation=tf.nn.leaky_relu, name="gen_07")  # 2000
-        g_08 = tf.reshape(g_07, [-1, 20, 20, 5], name="gen_08")  # 20x20x5
+        g_07 = tf.layers.dense(rand, 20 * 20 * 20, activation=tf.nn.leaky_relu, name="gen_07")  # 2000
+        g_08 = tf.reshape(g_07, [-1, 20, 20, 20], name="gen_08")  # 20x20x5
         g_08_bn = tf.layers.batch_normalization(g_08, momentum=0.95, epsilon=1e-4, training=training, name="gen_08_bn")
         g_09 = tf.concat([g_06_bn, g_08_bn], axis=3, name="gen_09")  # 20x20x10
-        g_10 = tf.layers.conv2d(g_09, 5, 3, (1, 1), "same", activation=tf.nn.leaky_relu, name="gen_10")  # 20x20x5
+        g_10 = tf.layers.conv2d(g_09, 20, 3, (1, 1), "same", activation=tf.nn.leaky_relu, name="gen_10")  # 20x20x5
         g_11 = tf.layers.conv2d(g_10, 1, 3, (1, 1), "same", activation=tf.nn.sigmoid, name="gen_11")  # 20x20x1
         return g_11
 
@@ -108,8 +108,8 @@ def train(start_step, restore):
     gen_vars = [var for var in tf.trainable_variables() if "gen" in var.name]
 
     global_step = tf.Variable(0, trainable=False)
-    dis_lr = tf.train.exponential_decay(learning_rate=0.00001, global_step=global_step, decay_steps=100, decay_rate=0.99)
-    gen_lr = tf.train.exponential_decay(learning_rate=0.00005, global_step=global_step, decay_steps=100, decay_rate=0.95)
+    dis_lr = tf.train.exponential_decay(learning_rate=0.0001, global_step=global_step, decay_steps=100, decay_rate=0.95)
+    gen_lr = tf.train.exponential_decay(learning_rate=0.0005, global_step=global_step, decay_steps=100, decay_rate=0.90)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
@@ -124,7 +124,7 @@ def train(start_step, restore):
         saver.restore(sess, "model/model.ckpt-%d" % start_step)
 
     n_dis = 1
-    n_gen = 5
+    n_gen = 1
     v_sample_rand = np.random.uniform(-1., 1., (batch_size, rand_size))
     for step in range(start_step, 5001):
         if step % 10 == 0:
