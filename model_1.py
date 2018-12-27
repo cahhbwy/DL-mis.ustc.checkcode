@@ -5,48 +5,59 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 
-def discriminator(d_00, label, reuse=None):
+def discriminator(image, label, reuse=None):
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_01 = tf.layers.conv2d(d_00, 20, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x20
-        d_03 = tf.layers.max_pooling2d(d_01, 2, 2, "valid", name="dis_03")  # 8x8x20
-        d_04 = tf.layers.conv2d(d_03, 50, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_04")  # 4x4x50
-        d_06 = tf.layers.max_pooling2d(d_04, 2, 2, "valid", name="dis_06")  # 2x2x50
-        d_07 = tf.layers.flatten(d_06, name="dis_07")  # 200
-        d_08 = tf.layers.dense(d_07, 500, activation=tf.nn.relu, name="dis_08")  # 500
-        d_09 = tf.layers.dropout(d_08, 0.2, name="dis_09")  # 500
+        d_01 = tf.layers.conv2d(image, 80, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x80
+        d_03 = tf.layers.max_pooling2d(d_01, 2, 2, "valid", name="dis_03")  # 8x8x80
+        d_04 = tf.layers.conv2d(d_03, 200, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_04")  # 4x4x200
+        d_06 = tf.layers.max_pooling2d(d_04, 2, 2, "valid", name="dis_06")  # 2x2x200
+        d_07 = tf.layers.flatten(d_06, name="dis_07")  # 800
+        d_08 = tf.layers.dense(d_07, 2000, activation=tf.nn.relu, name="dis_08")  # 2000
+        d_09 = tf.layers.dropout(d_08, 0.2, name="dis_09")  # 2000
         d_10 = tf.layers.dense(d_09, 1, name="dis_10")  # 1
         loss = tf.losses.sigmoid_cross_entropy(label, d_10)
         return loss
 
 
-def generator(rand, reuse=None):
+def generator_0(rand, reuse=None):
     with tf.variable_scope("generator", reuse=reuse):
-        g_00 = tf.layers.dense(rand, 5 * 5 * 20, activation=tf.nn.leaky_relu, name="gen_00")  # 500
-        g_01 = tf.reshape(g_00, [-1, 5, 5, 20], name="gen_01")  # 5x5x20
-        g_02 = tf.layers.conv2d_transpose(g_01, 10, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_02")  # 10x10x10
+        g_00 = tf.layers.dense(rand, 5 * 5 * 80, activation=tf.nn.leaky_relu, name="gen_00")  # 2000
+        g_01 = tf.reshape(g_00, [-1, 5, 5, 80], name="gen_01")  # 5x5x80
+        g_02 = tf.layers.conv2d_transpose(g_01, 40, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_02")  # 10x10x40
 
-        g_03 = tf.layers.dense(rand, 10 * 10 * 10, activation=tf.nn.leaky_relu, name="gen_03")  # 1000
-        g_04 = tf.reshape(g_03, [-1, 10, 10, 10], name="gen_04")  # 10x10x10
-        g_05 = tf.concat([g_02, g_04], axis=3, name="gen_05")  # 10x10x20
-        g_06 = tf.layers.conv2d_transpose(g_05, 5, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_06")  # 20x20x5
+        g_03 = tf.layers.dense(rand, 10 * 10 * 40, activation=tf.nn.leaky_relu, name="gen_03")  # 4000
+        g_04 = tf.reshape(g_03, [-1, 10, 10, 40], name="gen_04")  # 10x10x40
+        g_05 = tf.concat([g_02, g_04], axis=3, name="gen_05")  # 10x10x80
+        g_06 = tf.layers.conv2d_transpose(g_05, 20, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_06")  # 20x20x20
 
-        g_07 = tf.layers.dense(rand, 20 * 20 * 5, activation=tf.nn.leaky_relu, name="gen_07")  # 2000
-        g_08 = tf.reshape(g_07, [-1, 20, 20, 5], name="gen_08")  # 20x20x5
-        g_09 = tf.concat([g_06, g_08], axis=3, name="gen_09")  # 20x20x10
-        g_10 = tf.layers.conv2d(g_09, 5, 3, (1, 1), "same", activation=tf.nn.leaky_relu, name="gen_10")  # 20x20x5
-        g_11 = tf.layers.conv2d(g_10, 1, 3, (1, 1), "same", activation=tf.nn.sigmoid, name="gen_11")  # 20x20x1
+        g_07 = tf.layers.dense(rand, 20 * 20 * 20, activation=tf.nn.leaky_relu, name="gen_07")  # 8000
+        g_08 = tf.reshape(g_07, [-1, 20, 20, 20], name="gen_08")  # 20x20x20
+        g_09 = tf.concat([g_06, g_08], axis=3, name="gen_09")  # 20x20x40
+        g_10 = tf.layers.conv2d(g_09, 20, 3, (1, 1), "same", activation=tf.nn.leaky_relu, name="gen_10")  # 20x20x20
+        g_11 = tf.layers.conv2d(g_10, 1, 3, (1, 1), "same", activation=tf.nn.tanh, name="gen_11")  # 20x20x1    数据范围 -1 ~ +1
         return g_11
 
 
-def model(batch_size):
-    rand = tf.placeholder(tf.float32, [None, 100])
+def generator_1(rand, reuse=None):
+    with tf.variable_scope("generator", reuse=reuse):
+        g_00 = tf.layers.dense(rand, 2000, activation=tf.nn.leaky_relu, name="gen_00")  # 2000
+        g_01 = tf.reshape(g_00, [-1, 5, 5, 80], name="gen_01")  # 5x5x80
+        g_02 = tf.layers.conv2d_transpose(g_01, 40, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_02")  # 10x10x40
+        g_03 = tf.layers.conv2d_transpose(g_02, 20, 5, (2, 2), "same", activation=tf.nn.leaky_relu, name="gen_03")  # 20x20x20
+        g_04 = tf.layers.conv2d(g_03, 10, 5, (1, 1), "same", activation=tf.nn.leaky_relu, name="gen_04")  # 20x20x10
+        g_05 = tf.layers.conv2d(g_04, 1, 5, (1, 1), "same", activation=tf.nn.tanh, name="gen_05")  # 20x20x1
+        return g_05
+
+
+def model(rand, batch_size):
+    generator = generator_1
     real_image_uint8 = tf.placeholder(tf.uint8, [None, 20, 20, 1])
     fake_image_float = generator(rand)
-    fake_image_uint8 = tf.cast(tf.multiply(fake_image_float, 255.), tf.uint8)
-    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32), 255., name="dis_00")
+    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast((fake_image_float + 1.) / 2. * 256., tf.int32), 0, 255), tf.uint8)
+    real_image_float = (tf.cast(real_image_uint8, tf.float32) / 256. - 0.5) / 0.5
     dis_loss = discriminator(real_image_float, tf.ones([batch_size, 1])) + discriminator(fake_image_float, tf.zeros([batch_size, 1]), True)
     gen_loss = discriminator(fake_image_float, tf.ones([batch_size, 1]), True)
-    return rand, real_image_uint8, fake_image_uint8, dis_loss, gen_loss
+    return real_image_uint8, fake_image_uint8, dis_loss, gen_loss
 
 
 def visualize(images, labels=None, label2text=str, height=20, width=20, channel=1, pad=1):
@@ -91,7 +102,8 @@ def train(start_step, restore):
     image_data = data["train_x"]
     size = len(image_data)
 
-    m_rand, m_real_image, m_fake_image, m_dis_loss, m_gen_loss = model(batch_size)
+    m_rand = tf.placeholder(tf.float32, [None, rand_size])
+    m_real_image, m_fake_image, m_dis_loss, m_gen_loss = model(m_rand, batch_size)
     tf.summary.scalar("dis_loss", m_dis_loss)
     tf.summary.scalar("gen_loss", m_gen_loss)
     merged_summary_op = tf.summary.merge_all()
