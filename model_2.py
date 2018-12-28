@@ -5,9 +5,9 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 
-def discriminator(d_00, reuse=None):
+def discriminator(image, reuse=None):
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_01 = tf.layers.conv2d(d_00, 80, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x80
+        d_01 = tf.layers.conv2d(image, 80, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_01")  # 16x16x80
         d_03 = tf.layers.max_pooling2d(d_01, 2, 2, "valid", name="dis_03")  # 8x8x80
         d_04 = tf.layers.conv2d(d_03, 200, 5, (1, 1), "valid", activation=tf.nn.relu, name="dis_04")  # 4x4x200
         d_06 = tf.layers.max_pooling2d(d_04, 2, 2, "valid", name="dis_06")  # 2x2x200
