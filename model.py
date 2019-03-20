@@ -10,11 +10,11 @@ def model():
     x = tf.placeholder(tf.uint8, [None, 20, 20, 1], name="x")  # 20x20x1
     y = tf.placeholder(tf.int64, [None], name="y")
     h_00 = tf.divide(tf.cast(x, tf.float32), 256., name="h_00")  # 20x20x1
-    h_01 = tf.layers.conv2d(h_00, 20, 5, (1, 1), "valid", activation=tf.nn.relu, name="conv2d_01")  # 16x16x20
-    h_02 = tf.layers.max_pooling2d(h_01, 2, 2, "valid", name="pool_02")  # 8x8x20
-    h_03 = tf.layers.conv2d(h_02, 50, 5, (1, 1), "valid", activation=tf.nn.relu, name="conv2d_03")  # 4x4x50
-    h_04 = tf.layers.max_pooling2d(h_03, 2, 2, "valid", name="pool_04")  # 2x2x50
-    h_05 = tf.layers.flatten(h_04, name="flatten_05")  # 200
+    h_01 = tf.layers.conv2d(h_00, 20, 5, (1, 1), "same", activation=tf.nn.relu, name="conv2d_01")  # 20x20x20
+    h_02 = tf.layers.max_pooling2d(h_01, 2, 2, "valid", name="pool_02")  # 10x10x20
+    h_03 = tf.layers.conv2d(h_02, 50, 5, (1, 1), "same", activation=tf.nn.relu, name="conv2d_03")  # 10x10x50
+    h_04 = tf.layers.max_pooling2d(h_03, 2, 2, "valid", name="pool_04")  # 5x5x50
+    h_05 = tf.layers.flatten(h_04, name="flatten_05")  # 1250
     h_06 = tf.layers.dense(h_05, 500, activation=tf.nn.relu, name="dense_06")  # 500
     h_07 = tf.layers.dropout(h_06, 0.5, name="dropout_07")  # 500
     h_08 = tf.layers.dense(h_07, 32, name="dense_08")  # 32
@@ -104,12 +104,12 @@ def test():
     url = "http://mis.teach.ustc.edu.cn/randomImage.do?date='" + str(np.random.randint(2147483647)) + "'"
     req = request.urlopen(url)
     try:
-        request.urlretrieve(url, "/tmp/tmp.jpg")
+        request.urlretrieve(url, "sample/tmp.jpg")
     except IOError:
         print("IOError")
     finally:
         req.close()
-    img = Image.open("/tmp/tmp.jpg").convert('L').point(table)
+    img = Image.open("sample/tmp.jpg").convert('L').point(table)
     images = np.zeros([4, 20, 20, 1])
     images[0, :, :, 0] = np.array(img.crop((00, 0, 20, 20)))
     images[1, :, :, 0] = np.array(img.crop((20, 0, 40, 20)))
@@ -129,7 +129,7 @@ def test():
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-    train()
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+    # train()
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     test()
