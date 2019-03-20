@@ -2,6 +2,8 @@
 import tensorflow as tf
 import numpy as np
 from PIL import Image, ImageDraw
+import os
+from urllib import request
 
 
 def model():
@@ -74,7 +76,9 @@ def train(start_step=0, restore=False):
     tf.summary.scalar("accuracy", m_accuracy)
     merged_summary_op = tf.summary.merge_all()
 
-    sess = tf.Session()
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.3  # 占用GPU90%的显存
+    sess = tf.Session(config=config)
     sess.run(tf.global_variables_initializer())
     summary_writer = tf.summary.FileWriter("log", sess.graph)
     saver = tf.train.Saver(max_to_keep=5)
@@ -95,5 +99,37 @@ def train(start_step=0, restore=False):
         sess.run(op, feed_dict={m_x: train_x[index], m_y: train_y[index]})
 
 
+def test():
+    table = [255 if i > 140 else i for i in range(256)]
+    url = "http://mis.teach.ustc.edu.cn/randomImage.do?date='" + str(np.random.randint(2147483647)) + "'"
+    req = request.urlopen(url)
+    try:
+        request.urlretrieve(url, "/tmp/tmp.jpg")
+    except IOError:
+        print("IOError")
+    finally:
+        req.close()
+    img = Image.open("/tmp/tmp.jpg").convert('L').point(table)
+    images = np.zeros([4, 20, 20, 1])
+    images[0, :, :, 0] = np.array(img.crop((00, 0, 20, 20)))
+    images[1, :, :, 0] = np.array(img.crop((20, 0, 40, 20)))
+    images[2, :, :, 0] = np.array(img.crop((40, 0, 60, 20)))
+    images[3, :, :, 0] = np.array(img.crop((60, 0, 80, 20)))
+
+    labels = np.array(list("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"))
+
+    m_x, _, _, m_predict, _ = model()
+
+    with tf.device("/cpu"):
+        sess = tf.Session()
+        saver = tf.train.Saver()
+        saver.restore(sess, "model/model.ckpt-%d" % 3000)
+        v_predict = sess.run(m_predict, feed_dict={m_x: images})
+        print("".join(labels[v_predict]))
+
+
 if __name__ == '__main__':
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     train()
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    test()
