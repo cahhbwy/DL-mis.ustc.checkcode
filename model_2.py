@@ -7,35 +7,35 @@ import os
 
 
 def discriminator(batch_size, image, label_code, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.truncated_normal(stddev=0.1)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_00 = tf.concat([image, tf.ones([batch_size, 20, 20, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="dis_00")  # 20x20x31
-        d_01 = tf.layers.conv2d(d_00, 20, 5, (2, 2), "same", kernel_initializer=ki, name="dis_01")  # 10x10x20
-        d_02 = tf.layers.batch_normalization(d_01, momentum=0.9, epsilon=1e-3, training=training, name="dis_02")  # 10x10x20
-        d_03 = tf.nn.leaky_relu(d_02, name="dis_03")
-        d_04 = tf.concat([d_03, tf.ones([batch_size, 10, 10, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="dis_04")  # 10x10x52
-        d_05 = tf.layers.conv2d(d_04, 50, 5, (2, 2), "same", kernel_initializer=ki, name="dis_05")  # 5x5x50
-        d_06 = tf.layers.batch_normalization(d_05, momentum=0.9, epsilon=1e-3, training=training, name="dis_06")  # 5x5x50
-        d_07 = tf.nn.leaky_relu(d_06, name="dis_07")  # 5x5x50
-        d_08 = tf.layers.flatten(d_07, name="dis_08")  # 1250
-        d_09 = tf.concat([d_08, label_code], 1, name="dis_09")  # 1282
+        d_00 = tf.concat([image, tf.ones([batch_size, 20, 20, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="dis_00")  # 20x20x33
+        d_01 = tf.layers.conv2d(d_00, 32, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 10x10x32
+        d_02 = tf.concat([d_01, tf.ones([batch_size, 10, 10, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="dis_02")  # 10x10x64
+        d_03 = tf.layers.conv2d(d_02, 64, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_03")  # 5x5x64
+        d_04 = tf.layers.flatten(d_03, name="dis_04")  # 1600
+        d_05 = tf.concat([d_04, label_code], 1, name="dis_05")  # 1632
+        d_06 = tf.layers.dense(d_05, 128, kernel_initializer=ki, name="dis_06")  # 128
+        d_07 = tf.layers.batch_normalization(d_06, training=training, name="dis_07")  # 128
+        d_08 = tf.nn.leaky_relu(d_07, name="dis_08")
+        d_09 = tf.concat([d_08, label_code], 1, name="dis_09")  # 160
         d_10 = tf.layers.dense(d_09, 1, kernel_initializer=ki, name="dis_10")  # 1
         return d_10
 
 
 def generator(batch_size, rand_z, label_code, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.02)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("generator", reuse=reuse):
-        g_00 = tf.concat([rand_z, label_code], 1, name="gen_00")  # 532
-        g_01 = tf.layers.dense(g_00, 1250, kernel_initializer=ki, name="gen_00")  # 1250
-        g_02 = tf.layers.batch_normalization(g_01, momentum=0.9, epsilon=1e-3, training=training, name="gen_01")  # 1250
-        g_03 = tf.nn.relu(g_02, name="gen_02")  # 1250
-        g_04 = tf.reshape(g_03, [-1, 5, 5, 50], name="gen_03")  # 5x5x50
-        g_05 = tf.concat([g_04, tf.ones([batch_size, 5, 5, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="gen_04")  # 5x5x82
-        g_06 = tf.layers.conv2d_transpose(g_05, 20, 5, (2, 2), "same", kernel_initializer=ki, name="gen_05")  # 10x10x20
-        g_07 = tf.layers.batch_normalization(g_06, momentum=0.9, epsilon=1e-3, training=training, name="gen_06")  # 10x10x20
-        g_08 = tf.nn.relu(g_07, name="gen_07")  # 10x10x20
-        g_09 = tf.concat([g_08, tf.ones([batch_size, 10, 10, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="gen_08")  # 10x10x52
+        g_00 = tf.concat([rand_z, label_code], 1, name="gen_00")  # rand_z_size + 32
+        g_01 = tf.layers.dense(g_00, 1600, kernel_initializer=ki, name="gen_00")  # 1600
+        g_02 = tf.layers.batch_normalization(g_01, training=training, name="gen_01")  # 1600
+        g_03 = tf.nn.relu(g_02, name="gen_02")  # 1600
+        g_04 = tf.reshape(g_03, [-1, 5, 5, 64], name="gen_03")  # 5x5x64
+        g_05 = tf.concat([g_04, tf.ones([batch_size, 5, 5, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="gen_04")  # 5x5x96
+        g_06 = tf.layers.conv2d_transpose(g_05, 32, 5, (2, 2), "same", kernel_initializer=ki, name="gen_05")  # 10x10x32
+        g_07 = tf.layers.batch_normalization(g_06, training=training, name="gen_06")  # 10x10x32
+        g_08 = tf.nn.relu(g_07, name="gen_07")  # 10x10x32
+        g_09 = tf.concat([g_08, tf.ones([batch_size, 10, 10, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="gen_08")  # 10x10x64
         g_10 = tf.layers.conv2d_transpose(g_09, 1, 5, (2, 2), "same", activation=tf.nn.sigmoid, kernel_initializer=ki, name="gen_09")  # 20x20x1
         return g_10
 
@@ -59,7 +59,7 @@ def model(batch_size, rand_z_size=500):
 
 def train(start_step, restore):
     batch_size = 256
-    rand_z_size = 64
+    rand_z_size = 128
 
     data = np.load("data/data.npz")
     image_data = data["train_x"]
@@ -75,18 +75,18 @@ def train(start_step, restore):
     gen_vars = [var for var in tf.trainable_variables() if "gen" in var.name]
 
     global_step = tf.Variable(0, trainable=False)
-    dis_lr = tf.train.exponential_decay(learning_rate=0.0000010, global_step=global_step, decay_steps=100, decay_rate=0.95)
-    gen_lr = tf.train.exponential_decay(learning_rate=0.0000018, global_step=global_step, decay_steps=100, decay_rate=0.95)
+    dis_lr = tf.train.exponential_decay(learning_rate=0.0002, global_step=global_step, decay_steps=100, decay_rate=0.95)
+    gen_lr = tf.train.exponential_decay(learning_rate=0.0002, global_step=global_step, decay_steps=100, decay_rate=0.95)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        dis_op = tf.train.AdamOptimizer(dis_lr).minimize(m_dis_loss, var_list=dis_vars)
-        gen_op = tf.train.AdamOptimizer(gen_lr).minimize(m_gen_loss, var_list=gen_vars)
+        dis_op = tf.train.AdamOptimizer(dis_lr, beta1=0.5, beta2=0.9).minimize(m_dis_loss, var_list=dis_vars)
+        gen_op = tf.train.AdamOptimizer(gen_lr, beta1=0.5, beta2=0.9).minimize(m_gen_loss, var_list=gen_vars)
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     summary_writer = tf.summary.FileWriter("log", sess.graph)
-    saver = tf.train.Saver(max_to_keep=10, var_list=tf.global_variables())
+    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=10)
     if restore:
         saver.restore(sess, "model/model.ckpt-%d" % start_step)
 

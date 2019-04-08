@@ -7,22 +7,20 @@ import os
 
 
 def discriminator(image, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.truncated_normal(stddev=0.02)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_00 = tf.layers.conv2d(image, 32, 5, (2, 2), "same", kernel_initializer=ki, name="dis_01")  # 10x10x32
-        d_01 = tf.nn.leaky_relu(d_00, name="dis_03")  # 10x10x32
-        d_02 = tf.layers.conv2d(d_01, 64, 5, (2, 2), "same", kernel_initializer=ki, name="dis_04")  # 5x5x64
-        d_03 = tf.nn.leaky_relu(d_02, name="dis_06")  # 5x5x64
-        d_04 = tf.layers.flatten(d_03, name="dis_07")  # 1600
-        d_05 = tf.layers.dense(d_04, 128, name="dis_08")  # 128
-        d_06 = tf.layers.batch_normalization(d_05, training=training, name="dis_09")  # 128
-        d_07 = tf.nn.leaky_relu(d_06, name="dis_10")  # 128
-        d_08 = tf.layers.dense(d_07, 1, kernel_initializer=ki, name="dis_11")  # 1
-        return d_08
+        d_00 = tf.layers.conv2d(image, 32, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_00")  # 10x10x32
+        d_01 = tf.layers.conv2d(d_00, 64, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 5x5x64
+        d_02 = tf.layers.flatten(d_01, name="dis_02")  # 1600
+        d_03 = tf.layers.dense(d_02, 128, name="dis_03")  # 128
+        d_04 = tf.layers.batch_normalization(d_03, training=training, name="dis_04")  # 128
+        d_05 = tf.nn.leaky_relu(d_04, name="dis_05")  # 128
+        d_06 = tf.layers.dense(d_05, 1, kernel_initializer=ki, name="dis_06")  # 1
+        return d_06
 
 
 def generator(rand_z, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.02)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("generator", reuse=reuse):
         g_00 = tf.layers.dense(rand_z, 1600, kernel_initializer=ki, name="gen_00")  # 1600
         g_01 = tf.layers.batch_normalization(g_00, training=training, name="gen_01")  # 1600

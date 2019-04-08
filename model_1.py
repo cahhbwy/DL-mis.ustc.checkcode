@@ -7,7 +7,7 @@ import os
 
 
 def discriminator(image, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.truncated_normal(stddev=0.02)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("discriminator", reuse=reuse):
         d_00 = tf.layers.conv2d(image, 32, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_00")  # 10x10x32
         d_01 = tf.layers.conv2d(d_00, 64, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 5x5x64
@@ -18,10 +18,10 @@ def discriminator(image, reuse=tf.AUTO_REUSE):
 
 
 def generator(rand_z, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.truncated_normal(stddev=0.02)
+    ki = tf.initializers.random_normal(stddev=0.01)
     with tf.variable_scope("generator", reuse=reuse):
         g_00 = tf.layers.dense(rand_z, 1600, activation=tf.nn.relu, kernel_initializer=ki, name="gen_00")  # 1600
-        g_01 = tf.reshape(g_00, [-1, 5, 5, 64], name="gen_01")  # 5x5x50
+        g_01 = tf.reshape(g_00, [-1, 5, 5, 64], name="gen_01")  # 5x5x64
         g_02 = tf.layers.conv2d_transpose(g_01, 32, 5, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_02")  # 10x10x32
         g_03 = tf.layers.conv2d_transpose(g_02, 1, 5, (2, 2), "same", activation=tf.nn.sigmoid, kernel_initializer=ki, name="gen_03")  # 20x20x1
         return g_03
@@ -33,7 +33,8 @@ def model(batch_size, rand_z_size=500):
     real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32), 256., name="real_image_float")
     fake_image_float = generator(rand_z)
     fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float, 256.), tf.int32), 0, 255), tf.uint8)
-    dis_loss = tf.reduce_mean(discriminator(fake_image_float)) - tf.reduce_mean(discriminator(real_image_float))
+    dis_loss = tf.reduce_mean(discriminator(fake_image_float)) - \
+               tf.reduce_mean(discriminator(real_image_float))
     gen_loss = -tf.reduce_mean(discriminator(fake_image_float))
     alpha = tf.random_uniform(shape=[batch_size, 1, 1, 1], minval=0., maxval=1.)
     interpolates = alpha * real_image_float + (1. - alpha) * fake_image_float
@@ -46,7 +47,7 @@ def model(batch_size, rand_z_size=500):
 
 def train(start_step, restore):
     batch_size = 64
-    rand_z_size = 64
+    rand_z_size = 128
 
     data = np.load("data/data.npz")
     image_data = data["train_x"]
@@ -70,7 +71,7 @@ def train(start_step, restore):
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     summary_writer = tf.summary.FileWriter("log", sess.graph)
-    saver = tf.train.Saver(max_to_keep=10)
+    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=10)
     if restore:
         saver.restore(sess, "model/model.ckpt-%d" % start_step)
 
