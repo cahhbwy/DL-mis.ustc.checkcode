@@ -14,8 +14,8 @@ def discriminator(batch_size, image, label_code, training=True, reuse=tf.AUTO_RE
         d_02 = tf.concat([d_01, tf.ones([batch_size, 10, 10, 32]) * tf.reshape(label_code, [batch_size, 1, 1, 32])], 3, name="dis_02")  # 10x10x64
         d_03 = tf.layers.conv2d(d_02, 64, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_03")  # 5x5x64
         d_04 = tf.layers.flatten(d_03, name="dis_04")  # 1600
-        # d_05 = tf.concat([d_04, label_code], 1, name="dis_05")  # 1632
-        d_06 = tf.layers.dense(d_04, 128, kernel_initializer=ki, name="dis_06")  # 128
+        d_05 = tf.concat([d_04, label_code], 1, name="dis_05")  # 1632
+        d_06 = tf.layers.dense(d_05, 128, kernel_initializer=ki, name="dis_06")  # 128
         d_07 = tf.layers.batch_normalization(d_06, momentum=0.9, training=training, name="dis_07")  # 128
         d_08 = tf.nn.leaky_relu(d_07, name="dis_08")
         d_09 = tf.concat([d_08, label_code], 1, name="dis_09")  # 160
@@ -44,9 +44,9 @@ def model(batch_size, rand_z_size=500):
     rand_z = tf.placeholder(tf.float32, [None, rand_z_size], name="rand_z")
     training = tf.placeholder(tf.bool)
     real_label = tf.placeholder(tf.int64, [None], name="real_label")
-    real_label_code = tf.one_hot(real_label, 32, on_value=0.04, off_value=-0.04, dtype=tf.float32, name="real_label_code")
+    real_label_code = tf.one_hot(real_label, 32, on_value=0.05, off_value=-0.05, dtype=tf.float32, name="real_label_code")
     fake_label = tf.placeholder(tf.int64, [None], name="fake_label")
-    fake_label_code = tf.one_hot(fake_label, 32, on_value=0.04, off_value=-0.04, dtype=tf.float32, name="fake_label_code")
+    fake_label_code = tf.one_hot(fake_label, 32, on_value=0.05, off_value=-0.05, dtype=tf.float32, name="fake_label_code")
     real_image_uint8 = tf.placeholder(tf.uint8, [None, 20, 20, 1], name="real_image_uint8")
     real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32) - 128., 128., name="real_image_float")
     fake_image_float = generator(batch_size, rand_z, fake_label_code, training)
@@ -75,8 +75,8 @@ def train(start_step, restore):
     gen_vars = [var for var in tf.trainable_variables() if "gen" in var.name]
 
     global_step = tf.Variable(0, trainable=False)
-    dis_lr = tf.train.exponential_decay(learning_rate=0.0003, global_step=global_step, decay_steps=100, decay_rate=0.75)
-    gen_lr = tf.train.exponential_decay(learning_rate=0.0003, global_step=global_step, decay_steps=100, decay_rate=0.75)
+    dis_lr = tf.train.exponential_decay(learning_rate=0.0004, global_step=global_step, decay_steps=100, decay_rate=0.8)
+    gen_lr = tf.train.exponential_decay(learning_rate=0.0004, global_step=global_step, decay_steps=100, decay_rate=0.8)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
