@@ -23,16 +23,16 @@ def generator(rand_z, reuse=tf.AUTO_REUSE):
         g_00 = tf.layers.dense(rand_z, 1600, activation=tf.nn.relu, kernel_initializer=ki, name="gen_00")  # 1600
         g_01 = tf.reshape(g_00, [-1, 5, 5, 64], name="gen_01")  # 5x5x64
         g_02 = tf.layers.conv2d_transpose(g_01, 32, 5, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_02")  # 10x10x32
-        g_03 = tf.layers.conv2d_transpose(g_02, 1, 5, (2, 2), "same", activation=tf.nn.sigmoid, kernel_initializer=ki, name="gen_03")  # 20x20x1
+        g_03 = tf.layers.conv2d_transpose(g_02, 1, 5, (2, 2), "same", activation=tf.nn.tanh, kernel_initializer=ki, name="gen_03")  # 20x20x1
         return g_03
 
 
 def model(batch_size, rand_z_size=500):
     rand_z = tf.placeholder(tf.float32, [None, rand_z_size], name="rand_z")
     real_image_uint8 = tf.placeholder(tf.uint8, [None, 20, 20, 1], name="real_image_uint8")
-    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32), 256., name="real_image_float")
+    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32) - 128., 128., name="real_image_float")
     fake_image_float = generator(rand_z)
-    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float, 256.), tf.int32), 0, 255), tf.uint8)
+    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float + 1.0, 128.), tf.int32), 0, 255), tf.uint8)
     dis_loss = tf.reduce_mean(discriminator(fake_image_float)) - \
                tf.reduce_mean(discriminator(real_image_float))
     gen_loss = -tf.reduce_mean(discriminator(fake_image_float))
@@ -76,7 +76,7 @@ def train(start_step, restore):
         saver.restore(sess, "model/model.ckpt-%d" % start_step)
 
     v_sample_rand = np.random.uniform(-1., 1., (256, rand_z_size))
-    for step in range(start_step, 10001):
+    for step in range(start_step, 2001):
         if step < 5 or step % 100 == 0:
             n_dis = 100
             n_gen = 1

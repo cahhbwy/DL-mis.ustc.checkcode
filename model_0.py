@@ -29,7 +29,7 @@ def generator(rand_z, training=True, reuse=tf.AUTO_REUSE):
         g_04 = tf.layers.conv2d_transpose(g_03, 32, 5, (2, 2), "same", kernel_initializer=ki, name="gen_04")  # 10x10x32
         g_05 = tf.layers.batch_normalization(g_04, training=training, name="gen_05")  # 10x10x32
         g_06 = tf.nn.relu(g_05, name="gen_06")  # 10x10x32
-        g_07 = tf.layers.conv2d_transpose(g_06, 1, 5, (2, 2), "same", activation=tf.nn.sigmoid, kernel_initializer=ki, name="gen_07")  # 20x20x1
+        g_07 = tf.layers.conv2d_transpose(g_06, 1, 5, (2, 2), "same", activation=tf.nn.tanh, kernel_initializer=ki, name="gen_07")  # 20x20x1
         return g_07
 
 
@@ -37,9 +37,9 @@ def model(batch_size: int, rand_z_size: int):
     rand_z = tf.placeholder(tf.float32, [None, rand_z_size], name="rand_z")
     training = tf.placeholder(tf.bool)
     real_image_uint8 = tf.placeholder(tf.uint8, [None, 20, 20, 1], name="real_image_uint8")
-    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32), 256., name="real_image_float")
+    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32) - 128., 128., name="real_image_float")
     fake_image_float = generator(rand_z, training)
-    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float, 256.), tf.int32), 0, 255), tf.uint8)
+    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float + 1.0, 128.), tf.int32), 0, 255), tf.uint8)
     dis_loss = tf.losses.sigmoid_cross_entropy(tf.ones([batch_size, 1]), discriminator(real_image_float, training)) + \
                tf.losses.sigmoid_cross_entropy(tf.zeros([batch_size, 1]), discriminator(fake_image_float, training))
     gen_loss = tf.losses.sigmoid_cross_entropy(tf.ones([batch_size, 1]), discriminator(fake_image_float, training))
@@ -81,7 +81,7 @@ def train(start_step, restore):
     n_dis = 1
     n_gen = 5
     v_sample_rand = np.random.uniform(-1., 1., (256, rand_z_size))
-    for step in range(start_step, 10001):
+    for step in range(start_step, 2001):
         if step % 10 == 0:
             index = np.random.choice(size, batch_size)
             v_real_image = image_data[index]
