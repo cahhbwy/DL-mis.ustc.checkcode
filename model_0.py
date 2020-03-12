@@ -1,111 +1,171 @@
 # coding:utf-8
 # DCGAN with batch normalization
-import tensorflow as tf
-import numpy as np
-from util import visualize
+
 import os
+import datetime
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers, losses, optimizers, activations, metrics, models, initializers
+from util import visualize, load_data
 
 
-def discriminator(image, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.01)
-    with tf.variable_scope("discriminator", reuse=reuse):
-        d_00 = tf.layers.conv2d(image, 32, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_00")  # 10x10x32
-        d_01 = tf.layers.conv2d(d_00, 64, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 5x5x64
-        d_02 = tf.layers.flatten(d_01, name="dis_02")  # 1600
-        d_03 = tf.layers.dense(d_02, 128, name="dis_03")  # 128
-        d_04 = tf.layers.batch_normalization(d_03, training=training, name="dis_04")  # 128
-        d_05 = tf.nn.leaky_relu(d_04, name="dis_05")  # 128
-        d_06 = tf.layers.dense(d_05, 1, kernel_initializer=ki, name="dis_06")  # 1
-        return d_06
+def make_discriminator():
+    ki = initializers.RandomUniform(minval=-0.1, maxval=0.1)
+    images = layers.Input(shape=(20, 20, 1), dtype=tf.float32, name='images')  # (20, 20, 1)
+    hidden = layers.Conv2D(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, kernel_initializer=ki, name='conv2d_01')(images)  # (10, 10, 32)
+    hidden = layers.BatchNormalization(name='bn_01')(hidden)
+    hidden = layers.Conv2D(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, kernel_initializer=ki, name='conv2d_02')(hidden)  # (5, 5, 64)
+    hidden = layers.BatchNormalization(name='bn_02')(hidden)
+    hidden = layers.Flatten(name='flatten')(hidden)  # 1600
+    hidden = layers.Dense(units=128, kernel_initializer=ki, name='dense_01')(hidden)  # 64
+    hidden = layers.BatchNormalization(name='bn_03')(hidden)  # 64
+    hidden = layers.Activation(activation=tf.nn.leaky_relu)(hidden)  # 64
+    output = layers.Dense(units=1, kernel_initializer=ki, name='dense_02')(hidden)  # 1
+    return models.Model(inputs=[images], outputs=[output], name='discriminator')
 
 
-def generator(rand_z, training=True, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.01)
-    with tf.variable_scope("generator", reuse=reuse):
-        g_00 = tf.layers.dense(rand_z, 1600, kernel_initializer=ki, name="gen_00")  # 1600
-        g_01 = tf.layers.batch_normalization(g_00, training=training, name="gen_01")  # 1600
-        g_02 = tf.nn.relu(g_01, name="gen_02")  # 1600
-        g_03 = tf.reshape(g_02, [-1, 5, 5, 64], name="gen_03")  # 5x5x64
-        g_04 = tf.layers.conv2d_transpose(g_03, 32, 5, (2, 2), "same", kernel_initializer=ki, name="gen_04")  # 10x10x32
-        g_05 = tf.layers.batch_normalization(g_04, training=training, name="gen_05")  # 10x10x32
-        g_06 = tf.nn.relu(g_05, name="gen_06")  # 10x10x32
-        g_07 = tf.layers.conv2d_transpose(g_06, 1, 5, (2, 2), "same", activation=tf.nn.tanh, kernel_initializer=ki, name="gen_07")  # 20x20x1
-        return g_07
+def make_generator(noise_length):
+    ki = initializers.RandomUniform(minval=-0.1, maxval=0.1)
+    noises = layers.Input(shape=(noise_length,), name='noises')  # noises_shape
+    hidden = layers.Dense(units=1600, use_bias=False, kernel_initializer=ki, name='dense_01')(noises)  # 1600
+    hidden = layers.Activation(activation=activations.relu)(hidden)  # 1600
+    hidden = layers.Reshape(target_shape=(5, 5, 64), name='reshape')(hidden)  # (5, 5, 64)
+    hidden = layers.Conv2DTranspose(filters=32, kernel_size=5, strides=(2, 2), padding='same', kernel_initializer=ki, name='deconv2d_01')(hidden)  # (10, 10, 32)
+    hidden = layers.Activation(activation=activations.relu)(hidden)  # (10, 10, 32)
+    output = layers.Conv2DTranspose(filters=1, kernel_size=5, strides=(2, 2), padding='same', activation=activations.tanh, kernel_initializer=ki, name='deconv2d_02')(hidden)  # (20, 20, 1)
+    return models.Model(inputs=[noises], outputs=[output], name='generator')
 
 
-def model(batch_size: int, rand_z_size: int):
-    rand_z = tf.placeholder(tf.float32, [None, rand_z_size], name="rand_z")
-    training = tf.placeholder(tf.bool)
-    real_image_uint8 = tf.placeholder(tf.uint8, [None, 20, 20, 1], name="real_image_uint8")
-    real_image_float = tf.divide(tf.cast(real_image_uint8, tf.float32) - 128., 128., name="real_image_float")
-    fake_image_float = generator(rand_z, training)
-    fake_image_uint8 = tf.cast(tf.clip_by_value(tf.cast(tf.multiply(fake_image_float + 1.0, 128.), tf.int32), 0, 255), tf.uint8)
-    dis_loss = tf.losses.sigmoid_cross_entropy(tf.ones([batch_size, 1]), discriminator(real_image_float, training)) + \
-               tf.losses.sigmoid_cross_entropy(tf.zeros([batch_size, 1]), discriminator(fake_image_float, training))
-    gen_loss = tf.losses.sigmoid_cross_entropy(tf.ones([batch_size, 1]), discriminator(fake_image_float, training))
-    return training, rand_z, real_image_uint8, fake_image_uint8, dis_loss, gen_loss
+def train(start_step=0, restore=False, repeat=None):
+    batch_size = 256
+    noise_length = 128
+    epochs = 100
+    num_examples = 64
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    noise_seed = tf.random.normal([num_examples, noise_length])
 
+    train_ds = load_data(batch_size, with_label=False)
 
-def train(start_step, restore):
-    batch_size = 64
-    rand_z_size = 128
+    model_dis = make_discriminator()
+    model_gen = make_generator(noise_length)
 
-    data = np.load("data/data.npz")
-    image_data = data["train_x"]
-    size = len(image_data)
+    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00025, decay_steps=500, decay_rate=0.99, staircase=False)
+    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00045, decay_steps=500, decay_rate=0.99, staircase=False)
 
-    m_training, m_rand_z, m_real_image, m_fake_image, m_dis_loss, m_gen_loss = model(batch_size, rand_z_size)
-    tf.summary.scalar("dis_loss", m_dis_loss)
-    tf.summary.scalar("gen_loss", m_gen_loss)
-    merged_summary_op = tf.summary.merge_all()
+    optimizer_dis = optimizers.Adam(learning_rate=lr_dis, beta_1=0.5, beta_2=0.90)
+    optimizer_gen = optimizers.Adam(learning_rate=lr_gen, beta_1=0.5, beta_2=0.90)
 
-    dis_vars = [var for var in tf.trainable_variables() if "dis" in var.name]
-    gen_vars = [var for var in tf.trainable_variables() if "gen" in var.name]
+    checkpoint = tf.train.Checkpoint(step=tf.Variable(0), optimizer_gen=optimizer_gen, optimizer_dis=optimizer_dis, model_gen=model_gen, model_dis=model_dis)
+    checkpoint_manager = tf.train.CheckpointManager(checkpoint, f"model/", max_to_keep=5)
 
-    global_step = tf.Variable(0, trainable=False)
-    dis_lr = tf.train.exponential_decay(learning_rate=0.0002, global_step=global_step, decay_steps=100, decay_rate=0.95)
-    gen_lr = tf.train.exponential_decay(learning_rate=0.0005, global_step=global_step, decay_steps=100, decay_rate=0.95)
-
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        dis_op = tf.train.AdamOptimizer(dis_lr, beta1=0.5, beta2=0.9).minimize(m_dis_loss, var_list=dis_vars)
-        gen_op = tf.train.AdamOptimizer(gen_lr, beta1=0.5, beta2=0.9).minimize(m_gen_loss, var_list=gen_vars)
-
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
-    summary_writer = tf.summary.FileWriter("log", sess.graph)
-    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=10)
     if restore:
-        saver.restore(sess, "model/model.ckpt-%d" % start_step)
+        try:
+            checkpoint.restore(f"model/ckpt-{start_step}")
+            print(f"Restored from model/ckpt-{start_step}")
+        except tf.errors.NotFoundError:
+            checkpoint.restore(checkpoint_manager.latest_checkpoint)
+            if checkpoint_manager.latest_checkpoint:
+                start_step = checkpoint.step.numpy()
+                print("Restored from {}".format(checkpoint_manager.latest_checkpoint))
+            else:
+                start_step = 0
+                print("Initializing from scratch.")
 
-    n_dis = 1
-    n_gen = 5
-    v_sample_rand = np.random.uniform(-1., 1., (256, rand_z_size))
-    for step in range(start_step, 2001):
-        if step % 10 == 0:
-            index = np.random.choice(size, batch_size)
-            v_real_image = image_data[index]
-            v_rand_z = np.random.uniform(-1., 1., (batch_size, rand_z_size))
-            merged_summary, v_dis_loss, v_gen_loss = sess.run([merged_summary_op, m_dis_loss, m_gen_loss], feed_dict={m_rand_z: v_rand_z, m_real_image: v_real_image, m_training: False})
-            print("step %6d, dis_loss = %f, gen_loss = %f" % (step, v_dis_loss, v_gen_loss))
-            summary_writer.add_summary(merged_summary, step)
-        if step % 100 == 0:
-            v_fake_image = sess.run(m_fake_image, feed_dict={m_rand_z: v_sample_rand, m_training: False})
-            image = visualize(v_fake_image)
-            image.convert("RGB").save("sample/%06d.jpg" % step)
-            saver.save(sess, "model/model.ckpt", global_step=step)
-        for _ in range(n_dis):
-            index = np.random.choice(size, batch_size)
-            v_real_image = image_data[index]
-            v_rand_z = np.random.uniform(-1., 1., (batch_size, rand_z_size))
-            sess.run(dis_op, feed_dict={m_rand_z: v_rand_z, m_real_image: v_real_image, global_step: step, m_training: True})
-        for _ in range(n_gen):
-            index = np.random.choice(size, batch_size)
-            v_real_image = image_data[index]
-            v_rand_z = np.random.uniform(-1., 1., (batch_size, rand_z_size))
-            sess.run(gen_op, feed_dict={m_rand_z: v_rand_z, m_real_image: v_real_image, global_step: step, m_training: True})
+    train_loss_dis = metrics.Mean(name='train_loss_dis')
+    train_loss_gen = metrics.Mean(name='train_loss_gen')
+
+    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 20, 20, 1), dtype=tf.uint8, name='image_real')])
+    def train_step(image_real):
+        image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
+        noises = tf.random.normal([batch_size, noise_length])
+        with tf.GradientTape() as gt_dis, tf.GradientTape() as gt_gen:
+            image_fake = model_gen(noises, training=True)
+            output_real = model_dis(image_real, training=True)
+            output_fake = model_dis(image_fake, training=True)
+            loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
+            loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
+        gradients_dis = gt_dis.gradient(loss_dis, model_dis.trainable_variables)
+        gradients_gen = gt_gen.gradient(loss_gen, model_gen.trainable_variables)
+        optimizer_dis.apply_gradients(zip(gradients_dis, model_dis.trainable_variables))
+        optimizer_gen.apply_gradients(zip(gradients_gen, model_gen.trainable_variables))
+        train_loss_dis(loss_dis)
+        train_loss_gen(loss_gen)
+
+    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 20, 20, 1), dtype=tf.uint8, name='image_real'), tf.TensorSpec(shape=(), dtype=tf.int32, name="repeat_dis"), tf.TensorSpec(shape=(), dtype=tf.int32, name="repeat_gen")])
+    def train_step_repeat(image_real, repeat_dis, repeat_gen):
+        image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
+        for _ in range(repeat_dis):
+            noises = tf.random.normal([batch_size, noise_length])
+            with tf.GradientTape() as gt_dis:
+                image_fake = model_gen(noises)
+                output_real = model_dis(image_real)
+                output_fake = model_dis(image_fake)
+                loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
+            gradients_dis = gt_dis.gradient(loss_dis, model_dis.trainable_variables)
+            optimizer_dis.apply_gradients(zip(gradients_dis, model_dis.trainable_variables))
+            train_loss_dis(loss_dis)
+        for _ in range(repeat_gen):
+            noises = tf.random.normal([batch_size, noise_length])
+            with tf.GradientTape() as gt_gen:
+                image_fake = model_gen(noises)
+                output_fake = model_dis(image_fake)
+                loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
+            gradients_gen = gt_gen.gradient(loss_gen, model_gen.trainable_variables)
+            optimizer_gen.apply_gradients(zip(gradients_gen, model_gen.trainable_variables))
+            train_loss_gen(loss_gen)
+
+    log_info = f"log/{current_time}/info"
+    log_dis = f"log/{current_time}/dis"
+    log_gen = f"log/{current_time}/gen"
+    log_sample = f"log/{current_time}/sample"
+    summary_writer_info = tf.summary.create_file_writer(log_info)
+    summary_writer_dis = tf.summary.create_file_writer(log_dis)
+    summary_writer_gen = tf.summary.create_file_writer(log_gen)
+    summary_writer_sample = tf.summary.create_file_writer(log_sample)
+
+    with summary_writer_info.as_default():
+        tf.summary.trace_on(graph=True, profiler=True)
+
+        @tf.function(input_signature=[tf.TensorSpec(shape=(None, 20, 20, 1), dtype=tf.uint8, name="image_real")])
+        def create_graph(image_real):
+            image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
+            noises = tf.random.normal([batch_size, noise_length])
+            image_fake = model_gen(noises, training=True)
+            output_real = model_dis(image_real, training=True)
+            output_fake = model_dis(image_fake, training=True)
+            loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
+            loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
+            return loss_dis / 2 + loss_gen
+
+        _ = create_graph(tf.zeros((batch_size, 20, 20, 1), dtype=tf.uint8))
+        tf.summary.trace_export(name="graph", step=0, profiler_outdir=log_info)
+        tf.summary.trace_off()
+
+    for epoch in range(start_step, epochs):
+        if repeat:
+            for image_batch in train_ds:
+                train_step_repeat(image_batch, repeat["dis"], repeat["gen"])
+        else:
+            for image_batch in train_ds:
+                train_step(image_batch)
+        with summary_writer_dis.as_default():
+            tf.summary.scalar('Discriminator Loss', train_loss_dis.result(), step=epoch)
+        with summary_writer_gen.as_default():
+            tf.summary.scalar('Generator Loss', train_loss_gen.result(), step=epoch)
+        print(f"Epoch {epoch}, Gen Loss: {train_loss_gen.result()}, Dis Loss: {train_loss_dis.result()}")
+        samples = model_gen(noise_seed, training=False).numpy()
+        img = visualize(((samples + 1.) * 127.5).astype("uint8"))
+        img.save(f"sample/{epoch:06d}.jpg")
+        with summary_writer_sample.as_default():
+            tf.summary.image("sample", tf.expand_dims(tf.convert_to_tensor(np.array(img)), 0), step=epoch)
+        checkpoint.step.assign_add(1)
+        checkpoint_manager.save()
+        train_loss_dis.reset_states()
+        train_loss_gen.reset_states()
+    model_gen.save("model/generator.hdf5")
+    model_dis.save("model/discriminator.hdf5")
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-    train(0, False)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    train(0, False, repeat={"dis": 1, "gen": 3})

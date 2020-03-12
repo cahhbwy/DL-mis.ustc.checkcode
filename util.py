@@ -2,6 +2,18 @@
 
 from PIL import Image, ImageDraw
 import numpy as np
+import tensorflow as tf
+
+
+def load_data(batch_size, with_label=True):
+    data = np.load("data/data.npz")
+    train_x = np.concatenate([data["train_x"], data["test_x"]])
+    train_y = np.concatenate([data["train_y"], data["test_y"]])
+    if with_label:
+        train_ds = tf.data.Dataset.from_tensor_slices((train_x, train_y)).shuffle(21000).batch(batch_size)
+    else:
+        train_ds = tf.data.Dataset.from_tensor_slices(train_x).shuffle(21000).batch(batch_size)
+    return train_ds
 
 
 def visualize(images, labels=None, label2text=str, height=20, width=20, channel=1, pad=1):
@@ -25,7 +37,7 @@ def visualize(images, labels=None, label2text=str, height=20, width=20, channel=
         j = idx % num_v
         image[pad + i * (height + pad):pad + i * (height + pad) + height, pad + j * (width + pad):pad + j * (width + pad) + width, :] = img
     if channel == 1:
-        img = Image.fromarray(image.reshape(image.shape[:-1]))
+        img = Image.fromarray(image.reshape(image.shape[:-1])).convert("RGB")
     else:
         img = Image.fromarray(image)
     if labels is not None:
