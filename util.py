@@ -8,7 +8,7 @@ import tensorflow as tf
 def load_data(batch_size, with_label=True):
     data = np.load("data/data.npz")
     train_x = np.concatenate([data["train_x"], data["test_x"]])
-    train_y = np.concatenate([data["train_y"], data["test_y"]])
+    train_y = np.concatenate([data["train_y"], data["test_y"]]).astype(np.int32)
     if with_label:
         train_ds = tf.data.Dataset.from_tensor_slices((train_x, train_y)).shuffle(21000).batch(batch_size)
     else:

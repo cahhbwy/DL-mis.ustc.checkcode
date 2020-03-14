@@ -1,38 +1,34 @@
 # coding:utf-8
-# DCGAN with batch normalization
+# DCGAN
 
 import os
 import datetime
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers, losses, optimizers, activations, metrics, models, initializers
+from tensorflow.keras import layers, losses, optimizers, activations, metrics, models
 from util import visualize, load_data
 
 
 def make_discriminator():
-    ki = initializers.RandomUniform(minval=-0.1, maxval=0.1)
     images = layers.Input(shape=(20, 20, 1), dtype=tf.float32, name='images')  # (20, 20, 1)
-    hidden = layers.Conv2D(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, kernel_initializer=ki, name='conv2d_01')(images)  # (10, 10, 32)
+    hidden = layers.Conv2D(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_01')(images)  # (10, 10, 32)
     hidden = layers.BatchNormalization(name='bn_01')(hidden)
-    hidden = layers.Conv2D(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, kernel_initializer=ki, name='conv2d_02')(hidden)  # (5, 5, 64)
+    hidden = layers.Conv2D(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_02')(hidden)  # (5, 5, 64)
     hidden = layers.BatchNormalization(name='bn_02')(hidden)
     hidden = layers.Flatten(name='flatten')(hidden)  # 1600
-    hidden = layers.Dense(units=128, kernel_initializer=ki, name='dense_01')(hidden)  # 64
+    hidden = layers.Dense(units=128, name='dense_01')(hidden)  # 64
     hidden = layers.BatchNormalization(name='bn_03')(hidden)  # 64
     hidden = layers.Activation(activation=tf.nn.leaky_relu)(hidden)  # 64
-    output = layers.Dense(units=1, kernel_initializer=ki, name='dense_02')(hidden)  # 1
+    output = layers.Dense(units=1, name='dense_02')(hidden)  # 1
     return models.Model(inputs=[images], outputs=[output], name='discriminator')
 
 
 def make_generator(noise_length):
-    ki = initializers.RandomUniform(minval=-0.1, maxval=0.1)
     noises = layers.Input(shape=(noise_length,), name='noises')  # noises_shape
-    hidden = layers.Dense(units=1600, use_bias=False, kernel_initializer=ki, name='dense_01')(noises)  # 1600
-    hidden = layers.Activation(activation=activations.relu)(hidden)  # 1600
+    hidden = layers.Dense(units=1600, activation=activations.relu, name='dense_01')(noises)  # 1600
     hidden = layers.Reshape(target_shape=(5, 5, 64), name='reshape')(hidden)  # (5, 5, 64)
-    hidden = layers.Conv2DTranspose(filters=32, kernel_size=5, strides=(2, 2), padding='same', kernel_initializer=ki, name='deconv2d_01')(hidden)  # (10, 10, 32)
-    hidden = layers.Activation(activation=activations.relu)(hidden)  # (10, 10, 32)
-    output = layers.Conv2DTranspose(filters=1, kernel_size=5, strides=(2, 2), padding='same', activation=activations.tanh, kernel_initializer=ki, name='deconv2d_02')(hidden)  # (20, 20, 1)
+    hidden = layers.Conv2DTranspose(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=activations.relu, name='deconv2d_01')(hidden)  # (10, 10, 32)
+    output = layers.Conv2DTranspose(filters=1, kernel_size=5, strides=(2, 2), padding='same', activation=activations.tanh, name='deconv2d_02')(hidden)  # (20, 20, 1)
     return models.Model(inputs=[noises], outputs=[output], name='generator')
 
 
@@ -49,8 +45,8 @@ def train(start_step=0, restore=False, repeat=None):
     model_dis = make_discriminator()
     model_gen = make_generator(noise_length)
 
-    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00025, decay_steps=500, decay_rate=0.99, staircase=False)
-    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00045, decay_steps=500, decay_rate=0.99, staircase=False)
+    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0005, decay_steps=1000, decay_rate=0.95, staircase=False)
+    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0005, decay_steps=1000, decay_rate=0.95, staircase=False)
 
     optimizer_dis = optimizers.Adam(learning_rate=lr_dis, beta_1=0.5, beta_2=0.90)
     optimizer_gen = optimizers.Adam(learning_rate=lr_gen, beta_1=0.5, beta_2=0.90)
@@ -79,9 +75,9 @@ def train(start_step=0, restore=False, repeat=None):
         image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
         noises = tf.random.normal([batch_size, noise_length])
         with tf.GradientTape() as gt_dis, tf.GradientTape() as gt_gen:
-            image_fake = model_gen(noises, training=True)
-            output_real = model_dis(image_real, training=True)
-            output_fake = model_dis(image_fake, training=True)
+            image_fake = model_gen(noises)
+            output_real = model_dis(image_real)
+            output_fake = model_dis(image_fake)
             loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
             loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
         gradients_dis = gt_dis.gradient(loss_dis, model_dis.trainable_variables)
@@ -90,29 +86,6 @@ def train(start_step=0, restore=False, repeat=None):
         optimizer_gen.apply_gradients(zip(gradients_gen, model_gen.trainable_variables))
         train_loss_dis(loss_dis)
         train_loss_gen(loss_gen)
-
-    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 20, 20, 1), dtype=tf.uint8, name='image_real'), tf.TensorSpec(shape=(), dtype=tf.int32, name="repeat_dis"), tf.TensorSpec(shape=(), dtype=tf.int32, name="repeat_gen")])
-    def train_step_repeat(image_real, repeat_dis, repeat_gen):
-        image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
-        for _ in range(repeat_dis):
-            noises = tf.random.normal([batch_size, noise_length])
-            with tf.GradientTape() as gt_dis:
-                image_fake = model_gen(noises)
-                output_real = model_dis(image_real)
-                output_fake = model_dis(image_fake)
-                loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
-            gradients_dis = gt_dis.gradient(loss_dis, model_dis.trainable_variables)
-            optimizer_dis.apply_gradients(zip(gradients_dis, model_dis.trainable_variables))
-            train_loss_dis(loss_dis)
-        for _ in range(repeat_gen):
-            noises = tf.random.normal([batch_size, noise_length])
-            with tf.GradientTape() as gt_gen:
-                image_fake = model_gen(noises)
-                output_fake = model_dis(image_fake)
-                loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
-            gradients_gen = gt_gen.gradient(loss_gen, model_gen.trainable_variables)
-            optimizer_gen.apply_gradients(zip(gradients_gen, model_gen.trainable_variables))
-            train_loss_gen(loss_gen)
 
     log_info = f"log/{current_time}/info"
     log_dis = f"log/{current_time}/dis"
@@ -130,9 +103,9 @@ def train(start_step=0, restore=False, repeat=None):
         def create_graph(image_real):
             image_real = tf.subtract(tf.divide(tf.cast(image_real, tf.float32), 127.5), 1)
             noises = tf.random.normal([batch_size, noise_length])
-            image_fake = model_gen(noises, training=True)
-            output_real = model_dis(image_real, training=True)
-            output_fake = model_dis(image_fake, training=True)
+            image_fake = model_gen(noises)
+            output_real = model_dis(image_real)
+            output_fake = model_dis(image_fake)
             loss_dis = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_real), output_real) + losses.BinaryCrossentropy(from_logits=True)(tf.zeros_like(output_fake), output_fake)
             loss_gen = losses.BinaryCrossentropy(from_logits=True)(tf.ones_like(output_fake), output_fake)
             return loss_dis / 2 + loss_gen
@@ -142,12 +115,8 @@ def train(start_step=0, restore=False, repeat=None):
         tf.summary.trace_off()
 
     for epoch in range(start_step, epochs):
-        if repeat:
-            for image_batch in train_ds:
-                train_step_repeat(image_batch, repeat["dis"], repeat["gen"])
-        else:
-            for image_batch in train_ds:
-                train_step(image_batch)
+        for image_batch in train_ds:
+            train_step(image_batch)
         with summary_writer_dis.as_default():
             tf.summary.scalar('Discriminator Loss', train_loss_dis.result(), step=epoch)
         with summary_writer_gen.as_default():
@@ -168,4 +137,4 @@ def train(start_step=0, restore=False, repeat=None):
 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-    train(0, False, repeat={"dis": 1, "gen": 3})
+    train(0, False)
