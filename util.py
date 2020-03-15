@@ -10,9 +10,9 @@ def load_data(batch_size, with_label=True):
     train_x = np.concatenate([data["train_x"], data["test_x"]])
     train_y = np.concatenate([data["train_y"], data["test_y"]]).astype(np.int32)
     if with_label:
-        train_ds = tf.data.Dataset.from_tensor_slices((train_x, train_y)).shuffle(21000).batch(batch_size)
+        train_ds = tf.data.Dataset.from_tensor_slices((train_x, train_y)).shuffle(21000).repeat().batch(batch_size)
     else:
-        train_ds = tf.data.Dataset.from_tensor_slices(train_x).shuffle(21000).batch(batch_size)
+        train_ds = tf.data.Dataset.from_tensor_slices(train_x).shuffle(21000).repeat().batch(batch_size)
     return train_ds
 
 

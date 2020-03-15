@@ -33,10 +33,10 @@ def make_generator(noise_length):
 
 
 def train(start_step=0, restore=False):
-    batch_size = 256
+    batch_size = 64
     noise_length = 128
-    epochs = 1000
-    num_examples = 64
+    epochs = 5000
+    num_examples = 256
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     noise_seed = tf.random.normal([num_examples, noise_length])
 
@@ -45,8 +45,8 @@ def train(start_step=0, restore=False):
     model_dis = make_discriminator()
     model_gen = make_generator(noise_length)
 
-    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00030, decay_steps=1000, decay_rate=0.95, staircase=False)
-    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00045, decay_steps=1000, decay_rate=0.95, staircase=False)
+    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00015, decay_steps=1000, decay_rate=0.95, staircase=False)
+    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.00025, decay_steps=1000, decay_rate=0.95, staircase=False)
 
     optimizer_dis = optimizers.Adam(learning_rate=lr_dis, beta_1=0.5, beta_2=0.90)
     optimizer_gen = optimizers.Adam(learning_rate=lr_gen, beta_1=0.5, beta_2=0.90)
@@ -124,15 +124,13 @@ def train(start_step=0, restore=False):
     repeat_dis = 1
     repeat_gen = 5
 
+    train_ds_iterator = iter(train_ds)
     for epoch in range(start_step, epochs):
-        for i, image_batch in enumerate(train_ds):
-            if i < repeat_dis:
-                train_step_dis(image_batch)
-            else:
-                break
+        for i in range(repeat_dis):
+            train_step_dis(next(train_ds_iterator))
         for i in range(repeat_gen):
             train_step_gen()
-        if epoch % 10 == 0:
+        if epoch % 100 == 0:
             with summary_writer_dis.as_default():
                 tf.summary.scalar('Discriminator Loss', train_loss_dis.result(), step=epoch)
             with summary_writer_gen.as_default():
@@ -152,5 +150,5 @@ def train(start_step=0, restore=False):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     train(0, False)
