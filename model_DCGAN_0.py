@@ -32,11 +32,11 @@ def make_generator(noise_length):
     return models.Model(inputs=[noises], outputs=[output], name='generator')
 
 
-def train(start_step=0, restore=False, repeat=None):
-    batch_size = 256
+def train(start_step=0, restore=False):
+    batch_size = 64
     noise_length = 128
     epochs = 100
-    num_examples = 64
+    num_examples = 256
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     noise_seed = tf.random.normal([num_examples, noise_length])
 
@@ -45,8 +45,8 @@ def train(start_step=0, restore=False, repeat=None):
     model_dis = make_discriminator()
     model_gen = make_generator(noise_length)
 
-    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0005, decay_steps=1000, decay_rate=0.95, staircase=False)
-    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0005, decay_steps=1000, decay_rate=0.95, staircase=False)
+    lr_dis = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0003, decay_steps=1000, decay_rate=0.95, staircase=False)
+    lr_gen = optimizers.schedules.ExponentialDecay(initial_learning_rate=0.0010, decay_steps=1000, decay_rate=0.95, staircase=False)
 
     optimizer_dis = optimizers.Adam(learning_rate=lr_dis, beta_1=0.5, beta_2=0.90)
     optimizer_gen = optimizers.Adam(learning_rate=lr_gen, beta_1=0.5, beta_2=0.90)
@@ -131,8 +131,8 @@ def train(start_step=0, restore=False, repeat=None):
         checkpoint_manager.save()
         train_loss_dis.reset_states()
         train_loss_gen.reset_states()
-    model_gen.save("model/generator.hdf5")
-    model_dis.save("model/discriminator.hdf5")
+    model_gen.save(f"model/{current_time}-generator.hdf5", save_format="hdf5")
+    model_dis.save(f"model/{current_time}-discriminator.hdf5", save_format="hdf5")
 
 
 if __name__ == '__main__':

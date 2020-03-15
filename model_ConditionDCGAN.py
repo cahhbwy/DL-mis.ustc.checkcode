@@ -16,12 +16,11 @@ def make_discriminator():
         images,
         tf.reshape(tf.one_hot(labels, depth=32, on_value=1.0, off_value=-1.0), (tf.shape(labels)[0], 1, 1, 32)) * tf.ones(shape=(tf.shape(labels)[0], 20, 20, 32))
     ], axis=3)
-    hidden = layers.Conv2D(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_01')(hidden)  # (10, 10, 64)
+    hidden = layers.Conv2D(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_01')(hidden)  # (10, 10, 64)
     hidden = layers.BatchNormalization(name='bn_01')(hidden)
-    hidden = layers.Conv2D(filters=128, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_02')(hidden)  # (5, 5, 128)
-    hidden = layers.BatchNormalization(name='bn_02')(hidden)
+    hidden = layers.Conv2D(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=tf.nn.leaky_relu, name='conv2d_02')(hidden)  # (5, 5, 128)
     hidden = layers.Flatten(name='flatten')(hidden)  # 1600
-    hidden = layers.Dense(units=1024, name='dense_01')(hidden)  # 64
+    hidden = layers.Dense(units=256, name='dense_01')(hidden)  # 64
     hidden = layers.BatchNormalization(name='bn_03')(hidden)  # 64
     hidden = layers.Activation(activation=tf.nn.leaky_relu)(hidden)  # 64
     output = layers.Dense(units=1, name='dense_02')(hidden)  # 1
@@ -32,12 +31,11 @@ def make_generator(noise_length):
     noises = layers.Input(shape=(noise_length,), name='noises')  # noises_shape
     labels = layers.Input(shape=(), dtype=tf.int32, name='labels')
     hidden = tf.concat([noises, tf.one_hot(labels, depth=32, on_value=1.0, off_value=-1.0)], axis=1)
-    hidden = layers.Dense(units=128 * 5 * 5, activation=activations.relu, name='dense_01')(hidden)  # 1600
-    hidden = layers.Reshape(target_shape=(5, 5, 128), name='reshape')(hidden)  # (5, 5, 64)
+    hidden = layers.Dense(units=64 * 5 * 5, activation=activations.relu, name='dense_01')(hidden)  # 1600
+    hidden = layers.Reshape(target_shape=(5, 5, 64), name='reshape')(hidden)  # (5, 5, 64)
     hidden = tf.concat([hidden, tf.reshape(tf.one_hot(labels, depth=32, on_value=0.1, off_value=-0.1), (tf.shape(labels)[0], 1, 1, 32)) * tf.ones((tf.shape(labels)[0], 5, 5, 32), name="ones_02")], axis=3)
-    hidden = layers.Conv2DTranspose(filters=64, kernel_size=5, strides=(2, 2), padding='same', activation=activations.relu, name='deconv2d_01')(hidden)  # (10, 10, 32)
-    hidden = layers.Conv2DTranspose(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=activations.tanh, name='deconv2d_02')(hidden)  # (20, 20, 1)
-    output = layers.Conv2D(filters=1, kernel_size=5, strides=(1, 1), padding='same', activation=activations.tanh, name='conv2d_01')(hidden)  # (20, 20, 1)
+    hidden = layers.Conv2DTranspose(filters=32, kernel_size=5, strides=(2, 2), padding='same', activation=activations.relu, name='deconv2d_01')(hidden)  # (10, 10, 32)
+    output = layers.Conv2DTranspose(filters=1, kernel_size=5, strides=(2, 2), padding='same', activation=activations.tanh, name='deconv2d_02')(hidden)  # (20, 20, 1)
     return models.Model(inputs=[noises, labels], outputs=[output], name='generator')
 
 
@@ -125,8 +123,8 @@ def train(start_step=0, restore=False):
         checkpoint_manager.save()
         train_loss_dis.reset_states()
         train_loss_gen.reset_states()
-    model_gen.save("model/generator.hdf5")
-    model_dis.save("model/discriminator.hdf5")
+    model_gen.save(f"model/{current_time}-generator.hdf5", save_format="hdf5")
+    model_dis.save(f"model/{current_time}-discriminator.hdf5", save_format="hdf5")
 
 
 if __name__ == '__main__':
