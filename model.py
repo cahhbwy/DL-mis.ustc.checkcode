@@ -20,7 +20,7 @@ def load_data(batch_size):
 
 def make_model():
     images = layers.Input(shape=[20, 20, 1], dtype=tf.uint8)  # 20x20x1
-    hidden = tf.divide(tf.cast(images, tf.float32), 256.)
+    hidden = tf.image.convert_image_dtype(images, tf.float32)
     hidden = layers.Conv2D(filters=20, kernel_size=5, strides=(1, 1), padding='same', activation=activations.relu, name='conv2d_1')(hidden)  # 20x20x20
     hidden = layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding='valid', name='pool2d_1')(hidden)  # 10x10x20
     hidden = layers.Conv2D(filters=50, kernel_size=5, strides=(1, 1), padding='same', activation=activations.relu, name='conv2d_2')(hidden)  # 10x10x50
